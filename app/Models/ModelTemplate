@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Event extends Model
+{
+    use HasFactory;
+    protected $table = 'events';
+
+    public function logs()
+    {
+        return $this->hasMany(EventLog::class, 'eventId');
+    }
+
+    public function attachements()
+    {
+        return $this->hasMany(Event_Attachement::class, 'event_id');
+    }
+
+
+    //public function updateLogCount() {
+    //    $e = Event::find($request->eventId);
+    //    $e->recordCount = count($e->logs);
+    //    $e->save();
+    //}
+
+}

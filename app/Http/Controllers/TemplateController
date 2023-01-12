@@ -1,0 +1,105 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\Event;
+use App\Models\EventLog;
+use App\Models\Swl;
+
+class SearchController extends Controller
+{
+    public function index()
+    {
+        $active=array(1);
+        if(\Auth::check()) {
+            $active=array(0,1);
+        }
+        $events = Event::whereIn('active',$active)->orderBy('id','desc')->get();     
+        return view('index',['events'=>$events,'search'=>'']);
+    }
+
+    public function search(Request $req)
+    {
+        $search = strtoupper(trim($req->search));
+        $eventid = trim($req->eventId);
+        $event = Event::find($req->eventId);
+        $swl_call='';
+
+        $active=array(1);
+        if(\Auth::check()) {
+            $active=array(0,1);
+        }
+        
+        $startDate = date('Ymd', time() - (intval($req->months) * (86400*30)));
+
+        //->where('event_logs.call','=',$search)
+       
+        if($eventid) {
+        /*
+           $logs = EventLog::join('events','event_logs.eventId','=','events.id')
+           ->where('event_logs.call','like',$search.'%')
+           ->where('eventId','=',$eventid)
+           ->where('qsoDate','>',$startDate)
+           ->whereIn('events.active',$active)->orderBy('qsoDate','desc')->select(['events.special_download_image','events.tshirt_link','events.tshirt_thumbnail_image','events.tshirt_descr','events.special_download_image_descr','events.thumbnail_image','events.name as ename','events.event_link','events.cert_for_each_qso','event_logs.*'])->get(); 
+        */
+          // new query for "CALL" or "CALL/%". dont use simply $search.% bcause then you can simply enter a single letter and get every call that starts with the letter.
+          $logs = EventLog::join('events','event_logs.eventId','=','events.id')
+            ->where(function($query) use ($search) {
+                $query->where('event_logs.call','=',$search)
+                      ->orWhere('event_logs.call','like',$search.'/%');
+            })
+           ->where('eventId','=',$eventid)
+           ->where('qsoDate','>',$startDate)
+           ->whereIn('events.active',$active)->orderBy('qsoDate','desc')->select(['events.special_download_image','events.tshirt_link','events.tshirt_thumbnail_image','events.tshirt_descr','events.special_download_image_descr','events.thumbnail_image','events.name as ename','events.event_link','events.cert_for_each_qso','event_logs.*'])->get(); 
+//           dd($logs);
+        } else {
+//            $logs = EventLog::join('events','event_logs.eventId','=','events.id')
+//            ->where('event_logs.call','like',$search.'%')
+//            ->where('qsoDate','>',$startDate)
+//            ->whereIn('events.active',$active)->orderBy('qsoDate','desc')->select(['events.special_download_image','events.tshirt_link','events.tshirt_thumbnail_image','events.tshirt_descr','events.special_download_image_descr','events.thumbnail_image','events.name as ename','events.event_link','events.cert_for_each_qso','event_logs.*'])->get(); 
+
+            $logs = EventLog::join('events','event_logs.eventId','=','events.id')
+            ->where(function($query) use ($search) {
+                $query->where('event_logs.call','=',$search)
+                      ->orWhere('event_logs.call','like',$search.'/%');
+            })
+            ->where('qsoDate','>',$startDate)
+            ->whereIn('events.active',$active)->orderBy('qsoDate','desc')->select(['events.special_download_image','events.tshirt_link','events.tshirt_thumbnail_image','events.tshirt_descr','events.special_download_image_descr','events.thumbnail_image','events.name as ename','events.event_link','events.cert_for_each_qso','event_logs.*'])->get(); 
+        }
+
+        if(count($logs)<1) {
+            $logs = EventLog::join('events','event_logs.eventId','=','events.id')
+            ->join('swls','event_logs.id','=','swls.event_logs_id')
+            ->where('swls.swl_call','=',$search)
+            ->where('eventId','=',$eventid)
+            ->where('qsoDate','>',$startDate)
+            ->whereIn('events.active',$active)->orderBy('qsoDate','desc')->select(['swls.id as swl_id','events.tshirt_link','events.tshirt_thumbnail_image','events.tshirt_descr','events.special_download_image_descr','events.special_download_image', 'events.thumbnail_image','events.name as ename','events.cert_for_each_qso','event_logs.*'])->get();
+            $swl_call=$search;
+        }
+
+
+        $l=$logs->unique('thumbnail_image');
+        $foundEvents=array();
+        foreach($l as $lr){
+            if(!$lr['thumbnail_image']) $lr['thumbnail_image']='0_Placeholder.jpg';
+            $foundEvents[] = array('thumbnail_image'=>$lr['thumbnail_image'],
+            'event_name'=>$lr['ename'],
+            'special_download_image'=>$lr['special_download_image'],
+            'special_download_image_descr'=>$lr['special_download_image_descr'],
+            'tshirt_link'=>$lr['tshirt_link'],
+            'tshirt_thumbnail_image'=>$lr['tshirt_thumbnail_image'],
+            'tshirt_descr'=>$lr['tshirt_descr'],
+            'event_id'=>$lr['eventId'],
+            'event_link'=>$lr['event_link'],
+            'cert_for_each_qso'=>$lr['cert_for_each_qso'],
+            'log_id'=>$lr['id']);
+        }
+        
+        $events = Event::whereIn('active',$active)->orderBy('id','desc')->get();  
+        return view('index',['events'=>$events, 'event'=>$event, 'logs'=>$logs,'search'=>$search,'eventId'=>$eventid,'foundEvents'=>$foundEvents, 'swl_call'=>$swl_call]);
+    }
+
+
+
+}
